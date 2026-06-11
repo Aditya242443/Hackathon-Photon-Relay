@@ -1,83 +1,168 @@
-# 🚀 PhotonRelay: Free Space Optical Communication System
+# PhotonRelay
 
-An advanced, near-infrared laser-based communication system designed for deep-space and satellite-to-satellite networks, replacing traditional radio frequency (RF) limitations with sub-microradian optical precision.
+**Free Space Optical (FSO) Communication System**
+Far Away Hackathon 2026 — Space & Aerospace
 
----
-
-## 📌 Table of Contents
-* [About the Project](#-about-the-project)
-* [The Problem with RF & The Solution](#-the-problem-with-rf--the-solution)
-* [Core Subsystems & System Architecture](#-core-subsystems--system-architecture)
-* [Repository Structure](#-repository-structure)
-* [Tech Stack & Tools](#%EF%B8%8F-tech-stack--tools)
-* [Getting Started & Simulation Setup](#-getting-started--simulation-setup)
-* [Hackathon Timeline & Team Roles](#-hackathon-timeline--team-roles)
-* [Scientific Precedent](#-scientific-precedent)
+> PhotonRelay replaces radio frequency (RF) satellite links with near-infrared laser light — achieving **10–100× more bandwidth** at the same power level, with no spectrum licensing and inherent physical security from the laser's narrow beam width.
 
 ---
 
-## 💡 About the Project
-**PhotonRelay** is an interplanetary communication concept developed for the **Far Away Hackathon 2026** (Space & Aerospace Theme). It replaces standard radio wave transmissions with near-infrared ($1550\text{ nm}$) laser light for satellite-to-satellite and Low Earth Orbit (LEO) relay communication. By using optical frequencies, PhotonRelay eliminates spectrum congestion and handles massive throughput increases, achieving bandwidth capabilities 10x to 100x faster than comparable RF systems.
+## The Problem
+
+All satellites today communicate using RF or microwave transmission. Over long distances, this creates four hard limits:
+
+| Limitation | Impact |
+|---|---|
+| Bandwidth ceiling | High-resolution data transfer takes hours |
+| Inverse-square power loss | Signal degrades catastrophically with distance |
+| Spectrum congestion | RF is crowded, regulated, and increasingly interfered with |
+| No real-time recovery | At deep space distances, one-way light travel takes minutes — lost packets cannot be retransmitted in real time |
 
 ---
 
-## ⚡ The Problem with RF & The Solution
+## The Solution
 
-### The RF Bottleneck
-* **Bandwidth Ceiling:** RF has a hard throughput limit; transferring high-resolution data over deep space takes hours.
-* **Signal Degradation:** The inverse-square law causes radio signal power to drop catastrophically over millions of kilometers.
-* **Spectrum Congestion:** RF bands are crowded and heavily regulated; deploying more satellites creates severe interference.
-* **Real-Time Recovery Failure:** With one-way light travel times to Mars taking up to 24 minutes, real-time packet retransmission is impossible.
+PhotonRelay encodes binary data as **near-infrared laser pulses** using On-Off Keying (OOK) modulation — a servo-motor flap in front of a 1550 nm laser diode acts as a physical optical shutter:
 
-### The PhotonRelay Breakthrough
-* **High Bandwidth:** Uses short wavelength lasers to pack orders of magnitude more data per unit time.
-* **Inherent Security:** A narrow, pencil-thin beam width makes interception virtually impossible.
-* **Unregulated Spectrum:** Optical frequencies in deep space require no spectrum licensing.
-* **Optimized Payload:** Drastically lower mass and power consumption compared to bulky RF dishes.
+- Flap **open (90°)** → laser passes → bit `1`
+- Flap **closed (0°)** → laser blocked → bit `0`
+
+Data is structured using the **CCSDS Space Packet Protocol**, error-protected with **Reed-Solomon RS(255,223) FEC**, and carried across a three-node relay chain over two near-infrared wavelengths simultaneously.
 
 ---
 
-## ⚙️ Core Subsystems & System Architecture
+## System Architecture
 
-The system resolves the complex **Acquisition, Tracking, and Pointing (ATP)** challenges using three integrated innovations:
+```
+[GROUND STATION]  ──RF uplink──►  [LEO RELAY SATELLITE]  ──1550 nm OOK──►  [IPS]
+                                         ▲                                     │
+                                         └──────── 1550 nm return data ────────┘
+```
 
-1. **Three-Stage Satellite Tracking:**
-   * *Stage 1 (Astrometric Reduction):* CMOS focal arrays map incoming light onto star catalogs to extract the precise Angle of Arrival (AoA).
-   * *Stage 2 (Multi-Satellite TDOA):* Four neighboring LEO satellites use Time Difference of Arrival to calculate a 3D triangulation hyperboloid.
-   * *Stage 3 (Orbital Determination):* Gauss/Laplace algorithms predict future satellite point-ahead positioning based on historical coordinates.
-2. **Two-Layer Precision Beam Steering:**
-   * *Coarse Steering:* A 6-degree-of-freedom **Stewart Platform (Hexapod)** acts as a high-frequency vibration damper and wide-angle tracker.
-   * *Fine Steering:* A **Fast Steering Mirror (FSM)** driven by a piezoelectric actuator system corrects micro-vibrations in microseconds using closed-loop data from a Shack-Hartmann wavefront sensor.
-3. **Communication & Error Protocols:**
-   * *Modulation:* On-Off Keying (OOK) via a fast shutter mechanism (Flap Open = Bit 1, Flap Closed = Bit 0).
-   * *Wavelength Division Multiplexing (WDM):* Simultaneously transmits a $1064\text{ nm}$ continuous tracking beacon and a $1550\text{ nm}$ high-speed data stream on a single optical path using a dichroic beamsplitter.
-   * *Deterministic Error Correction:* Hardened **Reed-Solomon RS(255,223)** Forward Error Correction combined with **CCSDS Space Packet Protocol framing** to ensure guaranteed math bounds for zero-ambiguity packet recovery.
+| Node | Role |
+|---|---|
+| **Ground Station** | Sends and receives mission data via conventional RF — no optical hardware on the ground |
+| **LEO Relay Satellite** | Engineering core — tracks the IPS in 3D space, receives the deep-space laser beam, and steers its own transmit laser to sub-microradian accuracy |
+| **IPS (Inter Planetary Satellite)** | Sends and receives OOK laser data; acquires the LEO relay via star tracker → beacon lock → FSM closed-loop pointing |
 
 ---
 
-## 📂 Repository Structure
-This repository is organized according to mandatory hackathon guidelines:
-* **/simulation**: Core Python algorithms, data processing, and On-Off Keying (OOK) signal simulation code.
-* **/hardware**: EasyEDA circuit schematics for LEO and InterPlanetary Satellites (IPS), Tinkercad 3D housing layouts, and Wokwi servo simulation files.
-* **/docs**: Deep technical markdown documentation including `system_architecture.md`, `communication_protocol.md`, and `satellite_tracking.md`.
-* **/presentation**: The final 15-slide project pitch deck presentation PDF.
+## How It Works — Key Technical Pillars
+
+### 1. OOK Modulation
+Binary data drives a micro servo motor at a TCXO-clocked bit rate. The servo opens and closes a flap in front of the 1550 nm laser — converting every bit into a light pulse or silence. At the receiver, an InGaAs photodetector and transimpedance amplifier (TIA) reconstruct the original bit stream.
+
+### 2. Wavelength Division Multiplexing (WDM)
+Two signals travel simultaneously on the same optical path, separated by a dichroic beamsplitter at the receiver:
+
+| Wavelength | Purpose | Modulation |
+|---|---|---|
+| **1064 nm** | Position beacon — wide beam, used for tracking and acquisition | Continuous wave |
+| **1550 nm** | Data laser — narrow beam, high bandwidth | OOK via servo flap |
+
+Tracking and data links are **physically independent** — losing the data link does not break the tracking lock.
+
+### 3. Three-Stage Satellite Tracking (LEO)
+The LEO relay must locate the IPS to sub-microradian precision. A cascade of three stages narrows the uncertainty from kilometres down to microradians:
+
+| Stage | Method | Output |
+|---|---|---|
+| **Stage 1 — AoA** | Astrometric reduction maps the IPS beacon pixel position against a known star catalogue | Direction to **arcsecond** precision |
+| **Stage 2 — TDOA** | 4 neighbouring LEO satellites timestamp the signal arrival; 3 hyperboloid intersections give a unique 3D point | **3D position** of the IPS |
+| **Stage 3 — Orbital Determination** | Gauss/Laplace algorithm fits a Keplerian orbit to 3 time-stamped observations | **Future position** predicted — accounts for point-ahead angle |
+
+### 4. Backtracking Deep Space Reception
+When a laser arrives from deep space, the LEO relay intercepts it and measures its exact angle of arrival — then steers its own transmit laser back along that same direction:
+
+| Stage | What Happens |
+|---|---|
+| **Footprint intercept** | Primary mirror (>200 mm aperture) collects photons from the beam footprint, which is hundreds of km wide at interplanetary distances |
+| **Spectral filtering** | Fabry-Perot interferometer removes 99.99% of background light; passes only the 1550 nm signal |
+| **ToF ranging** | TCXO timestamps the arrival of the CCSDS packet; distance = (arrival − emission time) × speed of light |
+| **Spatial heterodyning** | Beam splitter + two InGaAs detectors measure wavefront phase difference → angle of arrival to **microradian** accuracy → feeds FSM pointing loop |
+
+### 5. Beam Steering — Two Layers
+- **Stewart Platform (6-DOF hexapod):** coarse pointing and vibration isolation — decouples the entire optical assembly from spacecraft micro-vibrations
+- **Fast Steering Mirror (FSM) + Piezo Driver:** fine pointing in microseconds — driven by the Shack-Hartmann wavefront sensor and spatial heterodyne angle output
+
+### 6. CCSDS Packet Framing
+All data follows the CCSDS Space Packet Protocol:
+
+| Field | Purpose |
+|---|---|
+| Sync marker (`0xFAF320`) | Marks every frame start — receiver re-synchronises even after mid-stream data loss |
+| Primary header | Spacecraft ID, sequence count, TCXO timestamp, data length |
+| RS payload (255 bytes) | 223 bytes of data + 32 RS redundancy bytes |
+| CRC-16 | Frame integrity check before RS decoding |
+
+### 7. Reed-Solomon FEC
+RS(255,223) provides mathematically guaranteed error correction with **zero silent failure**:
+- **223 bytes** data → encoded to **255-byte block** (32 redundancy bytes appended)
+- Up to **16 corrupted or lost bytes per block** recovered perfectly
+- If the limit is exceeded → error is **explicitly flagged**, never silently returning wrong data
+- ~14% overhead — a fixed, small cost for deterministic recovery
+
+> ML-based reconstruction was evaluated and dropped. ML has no guaranteed correction bound and can silently return wrong data. RS codes provide a hard mathematical limit with zero ambiguity.
+
+### 8. IPS Pointing Sequence
+The IPS uses a four-phase sequential acquisition — no TDOA or full backtracking stack needed, since it only tracks one known target:
+
+**Star tracker** (absolute attitude) → **Gyro/IMU** (attitude propagation) → **1064 nm beacon lock** (CMOS array) → **FSM closed loop** (microsecond correction) → **Data TX/RX active**
 
 ---
 
-## 🛠️ Tech Stack & Tools
-* **Language:** Python 3.8+
-* **Libraries:** NumPy (Vectorized signal parsing), Matplotlib (Signal waveform plotting)
-* **Design & Electronics Tools:** EasyEDA (Circuit Schematics), Tinkercad (3D Housing), Wokwi (Servo simulation), draw.io (Architecture diagrams)
-* **Presentation:** Canva
+## Simulation
+
+The `/simulation` folder contains a Python OOK signal simulator that generates and visualises the modulation scheme.
+
+**Output:** Three Matplotlib plots — clean OOK signal, noise-affected signal, decoded output.
+
+```bash
+pip install numpy matplotlib
+python simulation/ook_signal.py
+```
 
 ---
 
-## 🚀 Getting Started & Simulation Setup
+## Repository Structure
 
-### Prerequisites
-Ensure you have Python 3.8 or higher installed on your system. 
+```
+PhotonRelay/
+├── simulation/
+│   └── ook_signal.py             # OOK signal simulation and plots
+├── hardware/
+│   ├── leo_schematic.png         # LEO relay EasyEDA circuit schematic
+│   ├── ips_schematic.png         # IPS EasyEDA circuit schematic
+│   └── system_diagram.png        # Full system architecture diagram
+├── docs/
+│   ├── system_architecture.md    # Three-node architecture + full component lists
+│   ├── communication_protocol.md # OOK, WDM, CCSDS framing, Reed-Solomon FEC
+│   └── satellite_tracking.md     # 3-stage tracking, backtracking, IPS pointing
+├── presentation/
+│   └── PhotonRelay_Slides.pdf
+└── README.md
+```
 
-### Local Deployment
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/Aditya242/Hackathon-PhotonRelay.git](https://github.com/Aditya242/Hackathon-PhotonRelay.git)
+---
+
+## Documentation
+
+| Doc | What it covers |
+|---|---|
+| [`docs/system_architecture.md`](docs/system_architecture.md) | Full system overview — three-node architecture, end-to-end data flow, and complete component lists for both LEO relay and IPS |
+| [`docs/communication_protocol.md`](docs/communication_protocol.md) | Full protocol stack — OOK modulation, WDM dual-wavelength design, CCSDS packet framing, and Reed-Solomon FEC |
+| [`docs/satellite_tracking.md`](docs/satellite_tracking.md) | All three tracking systems — 3-stage LEO tracking cascade, 4-stage backtracking reception, IPS simplified pointing, and full precision chain |
+
+---
+
+## Team
+
+| Member | Role |
+|---|---|
+| Person 1 | Presentation & Visual Design |
+| Person 2 | Hardware Design & Schematics |
+| Person 3 | Docs, GitHub & Simulation |
+
+---
+
+*Far Away Hackathon 2026 — Space & Aerospace | Submission Deadline: 14 June 2026*
